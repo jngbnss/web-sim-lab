@@ -7,7 +7,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import jpeg from 'jpeg-js';
-import { PhysicsWorld } from '../src/physics/PhysicsWorld';
+import { CHASSIS_GROUPS, PhysicsWorld } from '../src/physics/PhysicsWorld';
 import { findCar } from '../src/vehicle/cars';
 import { optimizeMinTime } from '../src/world/MinTimeLine';
 import { RacingLine } from '../src/world/RacingLine';
@@ -18,6 +18,8 @@ import { CIRCUITS } from './fetch-osm';
 import { loadLayout } from './tracks-node';
 
 const id = process.argv[2] ?? 'monza';
+/** Line centre to wall face at least this far (m): half a car plus room. */
+const WALL_CLEARANCE = 1.75;
 const file = CIRCUITS.find((c) => c.id === id)!.file;
 const physics = await PhysicsWorld.create(1 / 60);
 const track = new ProceduralTrack(physics, loadLayout(id), { treesPerKm: 0 });
@@ -34,9 +36,29 @@ const gameLapTime = (path: [number, number][]) => {
 };
 // The curve between control points must not swing past the margin either (it did by up to
 // ~0.9 m: Monza's line came within 0.68 m of the edge).
-const res = optimizeMinTime({ ...input, start, limit: teamLineLimit(track) }, car, console.log, gameLapTime);
+// And never closer than WALL_CLEARANCE to a wall: at Monaco's hairpin the inside wall stands
+// ~4.8 m from the centreline, well inside the road's nominal half width (the line came
+// within 1 m of it and the cars hit it).
+const res = optimizeMinTime({ ...input, start, limit: wallAwareLimit(teamLineLimit(track)) }, car, console.log, gameLapTime);
 console.log(`${id}: min-curvature ${res.before.toFixed(2)} s -> min-time ${res.after.toFixed(2)} s (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
 writeFileSync(new URL(`../src/world/tracks/data/${file}_mintime.json`, import.meta.url), JSON.stringify({ car: 'f1-2026', lapTime: +res.after.toFixed(3), path: res.path }));
+
+/** Per sample: the limit, reduced where a wall stands closer (rays across the track to the barriers). */
+function wallAwareLimit(limit: number[]): number[] {
+  physics.step(); // the scene queries see the barrier colliders after one step
+  const { rapier, world } = physics;
+  const pts = track.getCenterline();
+  const rights = track.getRights();
+  return limit.map((l, i) => {
+    let wall = Infinity;
+    for (const s of [-1, 1]) {
+      const ray = new rapier.Ray({ x: pts[i].x, y: pts[i].y + 0.4, z: pts[i].z }, { x: rights[i].x * s, y: 0, z: rights[i].z * s });
+      const hit = world.castRay(ray, 30, true, undefined, CHASSIS_GROUPS);
+      if (hit) wall = Math.min(wall, hit.timeOfImpact);
+    }
+    return Math.max(0.5, Math.min(l, wall - WALL_CLEARANCE));
+  });
+}
 
 // Top-down image: road (grey), min-curvature (blue), min-time (red).
 const pts = track.getCenterline();
