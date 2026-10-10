@@ -18,8 +18,11 @@ import { CIRCUITS } from './fetch-osm';
 import { loadLayout } from './tracks-node';
 
 const id = process.argv[2] ?? 'monza';
-/** Line centre to wall face at least this far (m): half a car plus room. */
-const WALL_CLEARANCE = 1.75;
+/**
+ * Line centre to wall face at least this far (m): half a car (0.95) plus room for how far
+ * the AI strays from the line through a tight hairpin (~1.2 m inside at Monaco).
+ */
+const WALL_CLEARANCE = 2.75;
 const file = CIRCUITS.find((c) => c.id === id)!.file;
 const physics = await PhysicsWorld.create(1 / 60);
 const track = new ProceduralTrack(physics, loadLayout(id), { treesPerKm: 0 });
