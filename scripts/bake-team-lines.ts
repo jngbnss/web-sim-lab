@@ -7,7 +7,8 @@
  * the game's own speed model (RacingLine), for that car.
  *
  * Writes src/world/tracks/data/<Name>_teamlines.json: per team the control
- * offsets (cm across the track, one every 8 samples) and the lap times.
+ * offsets (cm to 0.1 across the track, one every 8 samples: whole cm moved Spa's lap
+ * time by a few hundredths through the vertical curvature) and the lap times.
  *
  *   npx tsx scripts/bake-team-lines.ts [circuit ...]     (default: all)
  */
@@ -51,7 +52,7 @@ for (const id of ids.filter((x) => !STREET.includes(x))) {
     };
     const res = optimizeMinTime(input, car, undefined, lapTime, [0.6, 0.3, 0.15]);
     const ctrl = controlsOf(points, rights, res.path);
-    out[team.id] = { shared: +res.before.toFixed(3), own: +res.after.toFixed(3), cm: Array.from(ctrl, (o) => Math.round(o * 100)) };
+    out[team.id] = { shared: +res.before.toFixed(3), own: +res.after.toFixed(3), cm: Array.from(ctrl, (o) => Math.round(o * 1000) / 10) };
     console.log(`${id} ${team.id}: shared line ${res.before.toFixed(2)} s -> own ${res.after.toFixed(2)} s`);
   }
   writeFileSync(dataUrl(`${file}_teamlines.json`), JSON.stringify({ samples: points.length, ctrl: 8, teams: out }));

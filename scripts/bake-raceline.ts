@@ -12,6 +12,7 @@ import { findCar } from '../src/vehicle/cars';
 import { optimizeMinTime } from '../src/world/MinTimeLine';
 import { RacingLine } from '../src/world/RacingLine';
 import { minCurvatureOffsets, STREET_MARGIN } from '../src/world/RacingLineOptimizer';
+import { teamLineLimit } from '../src/world/TeamLines';
 import { ProceduralTrack } from '../src/world/Track';
 import { CIRCUITS } from './fetch-osm';
 import { loadLayout } from './tracks-node';
@@ -26,12 +27,14 @@ const start = minCurvatureOffsets(input);
 const t0 = performance.now();
 // Objective = the game's own speed model (RacingLine), so what is optimized is what the AI drives.
 const gameLapTime = (path: [number, number][]) => {
-  const line = new RacingLine(path, car, { heights: track.heightsFor(path) });
+  const line = new RacingLine(path, car, { heights: track.heightsFor(path), profileOnly: true });
   const t = line.idealLapTime;
   line.dispose();
   return t;
 };
-const res = optimizeMinTime({ ...input, start }, car, console.log, gameLapTime);
+// The curve between control points must not swing past the margin either (it did by up to
+// ~0.9 m: Monza's line came within 0.68 m of the edge).
+const res = optimizeMinTime({ ...input, start, limit: teamLineLimit(track) }, car, console.log, gameLapTime);
 console.log(`${id}: min-curvature ${res.before.toFixed(2)} s -> min-time ${res.after.toFixed(2)} s (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
 writeFileSync(new URL(`../src/world/tracks/data/${file}_mintime.json`, import.meta.url), JSON.stringify({ car: 'f1-2026', lapTime: +res.after.toFixed(3), path: res.path }));
 
