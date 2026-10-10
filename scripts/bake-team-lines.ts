@@ -14,7 +14,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { PhysicsWorld } from '../src/physics/PhysicsWorld';
 import { CARS } from '../src/vehicle/cars';
-import { controlsOf, optimizeMinTime } from '../src/world/MinTimeLine';
+import { controlsOf, optimizeMinTime, pathFromControls } from '../src/world/MinTimeLine';
 import { RacingLine } from '../src/world/RacingLine';
 import { STREET_MARGIN } from '../src/world/RacingLineOptimizer';
 import { teamLineLimit } from '../src/world/TeamLines';
@@ -50,9 +50,14 @@ for (const id of ids.filter((x) => !STREET.includes(x))) {
       return t;
     };
     const res = optimizeMinTime(input, car, undefined, lapTime, [0.6, 0.3, 0.15]);
-    const ctrl = controlsOf(points, rights, res.path);
-    out[team.id] = { shared: +res.before.toFixed(3), own: +res.after.toFixed(3), cm: Array.from(ctrl, (o) => Math.round(o * 100)) };
-    console.log(`${id} ${team.id}: shared line ${res.before.toFixed(2)} s -> own ${res.after.toFixed(2)} s`);
+    // What the game loads: whole-cm controls, clamped to the limit. Rounding can lose a few
+    // hundredths; a team line must never be slower than the shared line, so then the team
+    // gets none (the game falls back to the shared line).
+    const cm = Array.from(controlsOf(points, rights, res.path), (o) => Math.round(o * 100));
+    const own = lapTime(pathFromControls(points, rights, cm.map((c) => c / 100), input.limit));
+    const sharedTime = lapTime(shared);
+    if (own <= sharedTime) out[team.id] = { shared: +sharedTime.toFixed(3), own: +own.toFixed(3), cm };
+    console.log(`${id} ${team.id}: shared line ${sharedTime.toFixed(2)} s -> own ${own.toFixed(2)} s${own > sharedTime ? ' (slower once rounded: keeps the shared line)' : ''}`);
   }
   writeFileSync(dataUrl(`${file}_teamlines.json`), JSON.stringify({ samples: points.length, ctrl: 8, teams: out }));
   console.log(`${id}: ${teams.length} team lines in ${((performance.now() - t0) / 1000).toFixed(0)} s`);

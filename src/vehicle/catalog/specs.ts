@@ -74,7 +74,7 @@ const FORMULA = rows('formula', [
   ['f1-audi', 'Audi', 'F1 2026', 'f1', 755, 808, 341, 'RWD', F1_DIMS, 'f1', 0x8a8f94, 0xbb0a30],
 ]);
 
-// Team characters: strong strengths and weaknesses, after The Race's "every 2025 car's key
+// Team characters (before evening out, below): strengths and weaknesses, after The Race's "every 2025 car's key
 // strength and weakness" and the 2025 speed traps (Ferrari / Williams fastest, McLaren
 // slow on the straights but best in corners). Each team trades: the sum is balanced by
 // lap-time simulation over five circuits (scripts/team-balance.ts), so a different team
@@ -91,7 +91,29 @@ const TRAITS: Record<string, CarTraits> = {
   'f1-haas': { downforce: 1, drag: 1, grip: 1, traction: 1, braking: 1, tyreWear: 1, label: '균형형' },
   'f1-audi': { downforce: 0.93, drag: 0.97, grip: 0.99, traction: 1, braking: 1.05, tyreWear: 0.9, label: '제동 · 타이어 관리 / 다운포스 부족' },
 };
-for (const spec of FORMULA) spec.traits = TRAITS[spec.id];
+// Players found the gaps too big (some cars turned in badly): every team keeps its character
+// but only SPREAD of each difference, and no car falls below a floor in what makes it turn
+// and stop (downforce, mechanical grip, traction, braking) or above a ceiling in drag and
+// tyre wear. Power is evened out the same way.
+const SPREAD = 0.4;
+const FLOOR = 0.985;
+const CEILING = 1.03;
+const REF_KW = 760;
+const MIN_KW = 750;
+const close = (v: number) => 1 + (v - 1) * SPREAD;
+for (const spec of FORMULA) {
+  const t = TRAITS[spec.id];
+  spec.traits = {
+    downforce: Math.max(close(t.downforce), FLOOR),
+    grip: Math.max(close(t.grip), FLOOR),
+    traction: Math.max(close(t.traction), FLOOR),
+    braking: Math.max(close(t.braking), FLOOR),
+    drag: Math.min(close(t.drag), CEILING),
+    tyreWear: Math.min(close(t.tyreWear), CEILING),
+    label: t.label,
+  };
+  spec.kw = Math.max(Math.round(REF_KW + (spec.kw - REF_KW) * SPREAD), MIN_KW);
+}
 
 export const CAR_SPECS: CarSpec[] = FORMULA;
 
