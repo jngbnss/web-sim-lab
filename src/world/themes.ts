@@ -50,7 +50,7 @@ export interface WorldTheme {
 
 const BASE: WorldTheme = {
   id: 'default',
-  hdri: 'sky_2k.hdr',
+  hdri: 'sky_2k.exr',
   exposure: 1,
   sunIntensity: 2.6,
   sunColor: 0xfff1dc,
@@ -97,7 +97,7 @@ export const THEMES: Record<string, WorldTheme> = {
   lombardy: {
     ...BASE,
     id: 'lombardy',
-    hdri: 'kloofendal_38d_partly_cloudy_puresky_2k.hdr',
+    hdri: 'kloofendal_38d_partly_cloudy_puresky_2k.exr',
     exposure: 1.0,
     sunColor: 0xffe6c4,
     sunIntensity: 3.6,
@@ -123,7 +123,7 @@ export const THEMES: Record<string, WorldTheme> = {
   england: {
     ...BASE,
     id: 'england',
-    hdri: 'kloofendal_overcast_puresky_2k.hdr',
+    hdri: 'kloofendal_overcast_puresky_2k.exr',
     exposure: 1.1,
     sunIntensity: 0.9,
     sunColor: 0xe8ecf0,
@@ -149,7 +149,7 @@ export const THEMES: Record<string, WorldTheme> = {
   ardennes: {
     ...BASE,
     id: 'ardennes',
-    hdri: 'kloofendal_28d_misty_puresky_2k.hdr',
+    hdri: 'kloofendal_28d_misty_puresky_2k.exr',
     exposure: 1.05,
     // Soft, cool Ardennes light, but enough sun to model the hills.
     sunIntensity: 2.3,
@@ -175,7 +175,7 @@ export const THEMES: Record<string, WorldTheme> = {
   parkland: {
     ...BASE,
     id: 'parkland',
-    hdri: 'kloofendal_43d_clear_puresky_2k.hdr',
+    hdri: 'kloofendal_43d_clear_puresky_2k.exr',
     sunIntensity: 2.8,
     fogDensity: 0.00018,
     grassTint: 0x8cc463,
@@ -185,7 +185,7 @@ export const THEMES: Record<string, WorldTheme> = {
   delta: {
     ...BASE,
     id: 'delta',
-    hdri: 'qwantani_puresky_2k.hdr',
+    hdri: 'qwantani_puresky_2k.exr',
     exposure: 1.05,
     sunIntensity: 2.0,
     sunColor: 0xfff0d8,
@@ -201,7 +201,7 @@ export const THEMES: Record<string, WorldTheme> = {
     ...BASE,
     id: 'japan',
     // Warm late-season afternoon (the Japanese GP).
-    hdri: 'qwantani_late_afternoon_puresky_2k.hdr',
+    hdri: 'qwantani_late_afternoon_puresky_2k.exr',
     sunColor: 0xffe2b8,
     sunIntensity: 3.0,
     fogDensity: 0.00016,
@@ -212,7 +212,7 @@ export const THEMES: Record<string, WorldTheme> = {
   desert: {
     ...BASE,
     id: 'desert',
-    hdri: 'syferfontein_6d_clear_puresky_2k.hdr',
+    hdri: 'syferfontein_6d_clear_puresky_2k.exr',
     exposure: 0.95,
     sunIntensity: 3.2,
     sunColor: 0xfff0d6,
@@ -226,7 +226,7 @@ export const THEMES: Record<string, WorldTheme> = {
   desertDusk: {
     ...BASE,
     id: 'desertDusk',
-    hdri: 'qwantani_dusk_2_puresky_2k.hdr',
+    hdri: 'qwantani_dusk_2_puresky_2k.exr',
     exposure: 1.15,
     sunIntensity: 1.6,
     sunColor: 0xffb070,
@@ -241,7 +241,7 @@ export const THEMES: Record<string, WorldTheme> = {
   mediterranean: {
     ...BASE,
     id: 'mediterranean',
-    hdri: 'syferfontein_6d_clear_puresky_2k.hdr',
+    hdri: 'syferfontein_6d_clear_puresky_2k.exr',
     sunIntensity: 3.0,
     fogDensity: 0.00018,
     grassTint: 0xa8bb6a,
@@ -251,7 +251,7 @@ export const THEMES: Record<string, WorldTheme> = {
   riviera: {
     ...BASE,
     id: 'riviera',
-    hdri: 'syferfontein_6d_clear_puresky_2k.hdr',
+    hdri: 'syferfontein_6d_clear_puresky_2k.exr',
     exposure: 1.02,
     sunIntensity: 3.4,
     sunColor: 0xfff0d8,
@@ -267,7 +267,7 @@ export const THEMES: Record<string, WorldTheme> = {
   pannonia: {
     ...BASE,
     id: 'pannonia',
-    hdri: 'kloofendal_43d_clear_puresky_2k.hdr',
+    hdri: 'kloofendal_43d_clear_puresky_2k.exr',
     sunIntensity: 2.9,
     fogDensity: 0.0002,
     grassTint: 0x9cbd62,
@@ -277,7 +277,7 @@ export const THEMES: Record<string, WorldTheme> = {
   dunes: {
     ...BASE,
     id: 'dunes',
-    hdri: 'sky_2k.hdr',
+    hdri: 'sky_2k.exr',
     fogDensity: 0.00024,
     grassTint: 0xa9b878,
     terrain: { height: 28, scale: 500, ramp: 500, ridged: false, forest: 0.15, meadow: 0xb7aa82, woods: 0x6b7a4a, rock: 0xcbbd98, rockLine: 1 },
@@ -286,7 +286,7 @@ export const THEMES: Record<string, WorldTheme> = {
   texas: {
     ...BASE,
     id: 'texas',
-    hdri: 'syferfontein_6d_clear_puresky_2k.hdr',
+    hdri: 'syferfontein_6d_clear_puresky_2k.exr',
     sunIntensity: 3.1,
     fogDensity: 0.00017,
     grassTint: 0xb5b86a,
@@ -296,7 +296,7 @@ export const THEMES: Record<string, WorldTheme> = {
   highland: {
     ...BASE,
     id: 'highland',
-    hdri: 'qwantani_puresky_2k.hdr',
+    hdri: 'qwantani_puresky_2k.exr',
     exposure: 1.05,
     sunIntensity: 2.6,
     fogDensity: 0.00022,
@@ -309,7 +309,7 @@ export const THEMES: Record<string, WorldTheme> = {
   tropical: {
     ...BASE,
     id: 'tropical',
-    hdri: 'kloofendal_28d_misty_puresky_2k.hdr',
+    hdri: 'kloofendal_28d_misty_puresky_2k.exr',
     exposure: 1.05,
     sunIntensity: 1.8,
     hemiIntensity: 0.4,

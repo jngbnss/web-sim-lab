@@ -5,6 +5,9 @@ import type { VehicleConfig } from './VehicleConfig';
 import type { WheelState } from './VehiclePhysics';
 import { tyreGeometry } from './cars/shapes';
 
+/** Pit stop: a wheel slid this far (m) off its hub is off the car (hidden). */
+export const WHEEL_OFF = 0.4;
+
 /**
  * Render-side representation of a car, fully separate from the physics body.
  * A GLB car only needs to implement this interface (see GltfCarVisual) —
@@ -19,6 +22,13 @@ export interface VehicleVisual {
   setDetail?(near: boolean): void;
   /** Tyre sidewall colour of the fitted compound. */
   setCompound?(color: number): void;
+  /**
+   * Pit stop: wheel i slid off its hub by `out` m (0 = fitted); past ~0.4 m it is off the car
+   * and hidden (the pit crew's tyre takes over).
+   */
+  setWheelOffset?(i: number, out: number): void;
+  /** World position of wheel i's hub (pit crew). */
+  wheelHub?(i: number, target: THREE.Vector3): THREE.Vector3;
   /** Wing damage 0..1 (front, rear): drooping wings, detached past the limit; 0 = repaired. */
   setDamage?(front: number, rear: number): void;
   /**
@@ -80,6 +90,17 @@ export abstract class PrimitiveCarVisual implements VehicleVisual {
     if (near === this.near) return;
     this.near = near;
     for (const d of this.details) d.visible = near;
+  }
+
+  setWheelOffset(i: number, out: number): void {
+    const spin = this.spins[i];
+    if (!spin) return;
+    spin.position.x = Math.sign(spin.parent!.parent!.position.x || 1) * out;
+    spin.visible = out < WHEEL_OFF;
+  }
+
+  wheelHub(i: number, target: THREE.Vector3): THREE.Vector3 {
+    return this.steers[i].getWorldPosition(target);
   }
 
   dispose(): void {

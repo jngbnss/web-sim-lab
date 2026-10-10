@@ -137,6 +137,8 @@ export class AIDriver {
     // 150-250 km/h bends squeezed the inside car into the wall); side by side on the straights.
     const singleFile = street && (slowCorner || cornerFactor < 0.6);
     const laneScale = singleFile ? 0 : 1;
+    /** Side of the corner ahead (+1 = it bends right), for passes into it. */
+    const cornerInside = Math.sign(this.signedCurvature(this.indexAhead(this.index, 40))) || 1;
     // Racing line position across the track, to express other cars relative to it.
     const lineLateral = this.track.lateral(this.line.points[this.index]);
     // Traffic is measured along the track (distance along it, offset across it), as the
@@ -176,7 +178,10 @@ export class AIDriver {
       // Between walls a pass needs a real gap (Monaco is nearly impossible to pass on).
       const passRoom = this.track.street ? 5.5 : 3.2;
       // No passing under yellow / VSC, except round a car that has stopped.
-      if (room > passRoom && ahead > 3 && (!this.rules.noPassing || otherSpeed < 8) && (!singleFile || otherSpeed < 8)) {
+      // Into a slow corner only up the inside: a pass round the outside of a hairpin on the
+      // brakes ran cars wide off the track (Red Bull Ring T3, three cars piled up in the runoff).
+      const outsideIntoCorner = slowCorner && passSide !== cornerInside;
+      if (room > passRoom && ahead > 3 && (!this.rules.noPassing || otherSpeed < 8) && (!singleFile || otherSpeed < 8) && !outsideIntoCorner) {
         desiredOffset = otherLat - lineLateral + passSide * 3.4;
       }
       // In its lane: keep a gap from which we can still stop if the car ahead brakes as

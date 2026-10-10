@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { VehicleConfig } from '../VehicleConfig';
 import type { WheelState } from '../VehiclePhysics';
-import type { VehicleVisual } from '../VehicleVisual';
+import { WHEEL_OFF, type VehicleVisual } from '../VehicleVisual';
 import { helmetTexture, liveryMaterial, numberTexture, rimMaterial, tyreMaterial, type Livery } from './F1Livery';
 import { SteeringWheel, type DashState } from './SteeringWheel';
 
@@ -74,7 +75,7 @@ let loading: Promise<void> | null = null;
 
 /** Loads the shared model once. Cars created before it is ready fall back to primitives. */
 export function loadF1Model(baseUrl: string): Promise<void> {
-  loading ??= new GLTFLoader().loadAsync(`${baseUrl}models/f1-2026.glb`).then((gltf) => {
+  loading ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`${baseUrl}models/f1-2026.glb`).then((gltf) => {
     // Undo KHR_mesh_quantization once: float positions in model meters (relative
     // to each LOD's parent: the scene for the body, the wheel centre for wheels)
     // with identity transforms below, so shaders can paint by model-space position.
@@ -456,6 +457,17 @@ export class GltfF1Visual implements VehicleVisual {
   /** Sidewall colour of the fitted compound. */
   setCompound(color: number): void {
     this.band.value.set(color);
+  }
+
+  setWheelOffset(i: number, out: number): void {
+    const spin = this.spins[i];
+    if (!spin) return;
+    spin.position.x = Math.sign(spin.parent!.parent!.position.x || 1) * out;
+    spin.visible = out < WHEEL_OFF;
+  }
+
+  wheelHub(i: number, target: THREE.Vector3): THREE.Vector3 {
+    return this.steers[i].getWorldPosition(target);
   }
 
   dispose(): void {

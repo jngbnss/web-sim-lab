@@ -323,6 +323,7 @@ export class Game {
           green: '그린 플래그 · 레이스 재개',
         }[m];
         this.hud.flag(m === 'green' ? 'green' : m === 'yellow' ? 'yellow' : 'vsc', text);
+        this.engineer?.onFlag(m);
       };
     }
     if (this.track.pit) {

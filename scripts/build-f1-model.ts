@@ -14,12 +14,13 @@
  *  4. paints by region into three material slots the game recolors per team:
  *     "paint" (team color), "accent" (wings, stripe), "carbon" (floor,
  *     suspension, halo); tyres into "tyre" and "rim";
- *  5. writes a quantized GLB (KHR_mesh_quantization).
+ *  5. writes a quantized, meshopt-compressed GLB (KHR_mesh_quantization +
+ *     EXT_meshopt_compression: 3.3 MB -> 1.1 MB; the game decodes it with MeshoptDecoder).
  */
 import { Document, NodeIO, type Material, type Mesh } from '@gltf-transform/core';
-import { KHRMeshQuantization } from '@gltf-transform/extensions';
-import { quantize } from '@gltf-transform/functions';
-import { MeshoptSimplifier } from 'meshoptimizer';
+import { EXTMeshoptCompression, KHRMeshQuantization } from '@gltf-transform/extensions';
+import { meshopt, quantize } from '@gltf-transform/functions';
+import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import * as THREE from 'three';
 import { mergeVertices, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { components, loadSoup, type Component, type Soup } from './f1-model-lib';
@@ -167,7 +168,7 @@ function bodySlot(p: THREE.Vector3): string {
   return 'paint';
 }
 
-const io = new NodeIO().registerExtensions([KHRMeshQuantization]);
+const io = new NodeIO().registerExtensions([KHRMeshQuantization, EXTMeshoptCompression]).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 const doc = new Document();
 const buffer = doc.createBuffer();
 const scene = doc.createScene('F1');
@@ -242,6 +243,8 @@ for (const t of tyres) {
 }
 
 await doc.transform(quantize({ quantizePosition: 14, quantizeNormal: 10 }));
+await MeshoptEncoder.ready;
+await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
 await io.write(OUT, doc);
 const bytes = (await import('node:fs')).statSync(OUT).size;
 console.log(`wrote ${OUT} (${(bytes / 1024 / 1024).toFixed(2)} MB)`);

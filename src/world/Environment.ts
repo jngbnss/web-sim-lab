@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
 import type { WorldTheme } from './themes';
 
 export interface EnvironmentOptions {
@@ -71,7 +71,8 @@ export class Environment {
       this.nightSky(renderer);
       return;
     }
-    const texture = await new HDRLoader().loadAsync(`${baseUrl}hdri/${this.theme.hdri}`);
+    // Half-float EXR with lossy DWAA compression (~1 MB; the Poly Haven .hdr files were ~4.6 MB).
+    const texture = await new EXRLoader().loadAsync(`${baseUrl}hdri/${this.theme.hdri}`);
     texture.mapping = THREE.EquirectangularReflectionMapping;
 
     const pmrem = new THREE.PMREMGenerator(renderer);
@@ -214,6 +215,8 @@ function analyzeEquirect(texture: THREE.Texture, minElevation: number): { sunDir
   const half = data instanceof Uint16Array;
   const read = (i: number) => (half ? THREE.DataUtils.fromHalfFloat(data[i]) : data[i]);
   const { width: w, height: h } = image;
+  // Row y counted from the top of the sky (EXRLoader stores the bottom row first, flipY off).
+  const row = (y: number) => (texture.flipY ? y : h - 1 - y);
 
   let best = -1;
   let bx = 0;
@@ -222,7 +225,7 @@ function analyzeEquirect(texture: THREE.Texture, minElevation: number): { sunDir
   // Only the upper hemisphere can hold the sun.
   for (let y = 0; y < h / 2; y += step)
     for (let x = 0; x < w; x += step) {
-      const i = (y * w + x) * 4;
+      const i = (row(y) * w + x) * 4;
       const lum = 0.2126 * read(i) + 0.7152 * read(i + 1) + 0.0722 * read(i + 2);
       if (lum > best) {
         best = lum;
@@ -247,7 +250,7 @@ function analyzeEquirect(texture: THREE.Texture, minElevation: number): { sunDir
   const y1 = Math.floor(h * 0.49);
   for (let y = y0; y < y1; y++)
     for (let x = 0; x < w; x += 8) {
-      const i = (y * w + x) * 4;
+      const i = (row(y) * w + x) * 4;
       r += read(i);
       g += read(i + 1);
       b += read(i + 2);

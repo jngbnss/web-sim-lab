@@ -44,6 +44,14 @@ async function main(): Promise<void> {
   if (!container) throw new Error('#app container missing');
 
   try {
+    // Menu artwork: a studio shot of one car (scripts/render-cars.ts).
+    const carShot = new URLSearchParams(window.location.search).get('carshot');
+    if (carShot) {
+      loading?.remove();
+      const { runCarShot } = await import('./ui/CarShot');
+      await runCarShot(carShot, container);
+      return;
+    }
     const config = readConfig();
     // The 3D engine, physics WASM and car models download while the menu is open.
     const engine = Promise.all([import('./core/Game'), import('./vehicle/cars')]);

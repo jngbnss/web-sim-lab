@@ -7,8 +7,7 @@ export interface FollowCameraOptions {
   /** Point the camera looks at, relative to the car (up / ahead). */
   lookHeight: number;
   lookAhead: number;
-  /** Exponential smoothing rates (1/s). Higher = stiffer. */
-  positionDamping: number;
+  /** Exponential smoothing rate (1/s) of the heading the camera follows. Higher = stiffer. */
   rotationDamping: number;
   baseFov: number;
   /** Extra FOV at top speed for a sense of speed. */
@@ -20,10 +19,9 @@ const DEFAULTS: FollowCameraOptions = {
   height: 2.6,
   lookHeight: 1.1,
   lookAhead: 3,
-  positionDamping: 9,
   rotationDamping: 4.5,
   baseFov: 62,
-  speedFov: 14,
+  speedFov: 8,
 };
 
 /** Camera views, cycled with C (like the F1 games: chase, far chase, T-cam, cockpit, nose). */
@@ -81,25 +79,29 @@ function shortestAngle(from: number, to: number): number {
 }
 
 const _forward = new THREE.Vector3();
-const _desired = new THREE.Vector3();
 const _look = new THREE.Vector3();
 
 /**
  * Third-person chase camera (NFS/Forza style).
  * Only the car's *yaw* is followed (smoothed), so pitch/roll from suspension
- * and bumps never shake the view; position is smoothed separately.
+ * and bumps never shake the view. The camera keeps a fixed distance behind the
+ * car (a lagging position surged in and out with every brake and throttle) and
+ * follows its height slowly (no bobbing over bumps and kerbs).
  */
 export class FollowCamera {
   readonly camera: THREE.PerspectiveCamera;
   readonly options: FollowCameraOptions;
   private yaw = 0;
+  /** Smoothed height of the car (chase views) and pitch of its nose (onboard views). */
+  private height = 0;
+  private pitch = 0;
   private initialized = false;
   private readonly lookTarget = new THREE.Vector3();
   mode: CameraMode = 'chase';
 
   // --- camera feel: shake from speed, kerbs and impacts ---------------------
-  /** Index into SHAKE_LEVELS. */
-  shakeLevel = 2;
+  /** Index into SHAKE_LEVELS (off by default: players found the view wobbly). */
+  shakeLevel = 0;
   /** 0..1: how rough the surface under the car is (kerbs, grass, gravel); set by the game. */
   private roughness = 0;
   /** Decaying 0..1 kick from impacts (sudden velocity changes). */
@@ -283,15 +285,10 @@ export class FollowCamera {
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
     // Behind the car = opposite of its forward (-sin, -cos) -> (+sin, +cos).
-    _desired.set(target.position.x + sin * o.distance, target.position.y + o.height, target.position.z + cos * o.distance);
-    this.camera.position.lerp(_desired, damp(o.positionDamping, dt));
-
-    _look.set(
-      target.position.x - sin * o.lookAhead,
-      target.position.y + o.lookHeight,
-      target.position.z - cos * o.lookAhead,
-    );
-    this.lookTarget.lerp(_look, damp(o.positionDamping * 1.5, dt));
+    // Slow height follow (a stale height after a long time in another view: catch up at once).
+    this.height = Math.abs(target.position.y - this.height) > 15 ? target.position.y : this.height + (target.position.y - this.height) * damp(10, dt);
+    this.camera.position.set(target.position.x + sin * o.distance, this.height + o.height, target.position.z + cos * o.distance);
+    this.lookTarget.set(target.position.x - sin * o.lookAhead, this.height + o.lookHeight, target.position.z - cos * o.lookAhead);
     this.camera.lookAt(this.lookTarget);
 
     const fov = o.baseFov + o.speedFov * Math.min(Math.max(speedRatio, 0), 1) ** 1.5;
@@ -318,14 +315,23 @@ export class FollowCamera {
     return this.mode;
   }
 
-  /** Rigidly mounted on the car (suspension pitch and roll included, like a real onboard). */
+  /**
+   * Mounted on the car, but the view stays level: no roll, and the nose's pitch (the slope of
+   * the road) followed smoothly, so suspension dive, squat and roll do not rock the picture.
+   */
   private updateOnboard(target: THREE.Object3D, speedRatio: number, dt: number): void {
     const mount = ONBOARD[this.mode as OnboardMode];
     target.updateMatrixWorld();
     _m.copy(target.matrixWorld);
     this.camera.position.copy(_local.copy(mount.pos).applyMatrix4(_m));
-    this.lookTarget.copy(_local.copy(mount.look).applyMatrix4(_m));
-    this.camera.up.set(0, 1, 0).applyQuaternion(target.quaternion);
+    _forward.set(0, 0, -1).applyQuaternion(target.quaternion);
+    const flat = Math.hypot(_forward.x, _forward.z) || 1;
+    const pitch = Math.atan2(_forward.y, flat);
+    this.pitch = this.initialized ? this.pitch + (pitch - this.pitch) * damp(2.5, dt) : pitch;
+    const lookPitch = this.pitch + Math.atan2(mount.look.y - mount.pos.y, mount.pos.z - mount.look.z);
+    const c = Math.cos(lookPitch);
+    this.lookTarget.set(_forward.x / flat, 0, _forward.z / flat).multiplyScalar(c).setY(Math.sin(lookPitch)).add(this.camera.position);
+    this.camera.up.set(0, 1, 0);
     this.camera.lookAt(this.lookTarget);
     const fov = mount.fov + 6 * Math.min(Math.max(speedRatio, 0), 1) ** 1.5;
     if (Math.abs(fov - this.camera.fov) > 0.01) {
@@ -354,6 +360,7 @@ export class FollowCamera {
     const o = this.mode === 'far' ? { ...this.options, distance: this.options.distance * 1.6, height: this.options.height * 1.5 } : this.options;
     _forward.set(0, 0, -1).applyQuaternion(target.quaternion);
     this.yaw = Math.atan2(-_forward.x, -_forward.z);
+    this.height = target.position.y;
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
     this.camera.position.set(

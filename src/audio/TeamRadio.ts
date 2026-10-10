@@ -4,7 +4,7 @@ import linesRaw from './radio-lines.json?raw';
  * Engineer team radio: pre-recorded voice clips (open-source TTS, see
  * scripts/radio/generate.py) chained into a message, played through a radio
  * effect (beep, 300-3000 Hz band, light distortion, static) while the game
- * sound is ducked, with a subtitle at the bottom of the screen.
+ * sound is ducked, with a Korean subtitle at the bottom of the screen.
  *
  * Messages come from src/audio/radio-lines.json: each line is a template per
  * language ("You are P{pos}. Car ahead is {gap} seconds up the road."); the
@@ -250,12 +250,12 @@ export class TeamRadio {
 
   private showSubtitle(id: RadioLine, vars: RadioVars): void {
     if (!this.settings.subtitles) return;
-    const en = radioText(id, vars, 'en');
+    // English voice (as in F1), Korean subtitles (the players asked for both).
     this.subtitle.replaceChildren();
     const who = document.createElement('b');
-    who.textContent = '🎧 Engineer';
+    who.textContent = '🎧 엔지니어';
     const main = document.createElement('span');
-    main.textContent = en;
+    main.textContent = radioText(id, vars, 'ko');
     this.subtitle.append(who, main);
     this.subtitle.hidden = false;
   }

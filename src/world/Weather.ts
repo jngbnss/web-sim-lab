@@ -80,7 +80,7 @@ export function weatherTheme(theme: WorldTheme, w: WeatherState): WorldTheme {
   if (w.time === 'dusk') {
     t = {
       ...t,
-      hdri: 'qwantani_dusk_2_puresky_2k.hdr',
+      hdri: 'qwantani_dusk_2_puresky_2k.exr',
       sunColor: 0xff9248,
       sunIntensity: 3.3,
       envIntensity: 0.9,
@@ -109,7 +109,7 @@ export function weatherTheme(theme: WorldTheme, w: WeatherState): WorldTheme {
     const rain = w.weather === 'rain';
     const drizzle = w.weather === 'drizzle';
     if (w.time !== 'night') {
-      t.hdri = 'kloofendal_overcast_puresky_2k.hdr';
+      t.hdri = 'kloofendal_overcast_puresky_2k.exr';
       t.sunColor = w.time === 'dusk' ? 0xffc8a0 : 0xeef0f2;
       t.sunIntensity *= rain ? 0.22 : drizzle ? 0.28 : 0.35;
       t.hemiIntensity = 0.3;

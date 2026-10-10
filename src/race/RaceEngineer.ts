@@ -3,6 +3,7 @@ import type { Vehicle } from '../vehicle/Vehicle';
 import type { RacingLine } from '../world/RacingLine';
 import type { Track } from '../world/Track';
 import type { PitStops } from './PitStops';
+import type { ControlMessage } from './RaceControl';
 import type { RaceManager, Racer } from './RaceManager';
 
 /**
@@ -10,7 +11,8 @@ import type { RaceManager, Racer } from './RaceManager';
  * team radio (CrewChief-style situations, our own lines): lap reports and
  * gaps, attack / defend, tyre wear and "box, box", damage and punctures,
  * yellow flags for crashes just ahead, places won and lost, pit stops,
- * braking advice at slow corners (once per corner), last lap and the flag. Priorities: 2 =
+ * braking advice at slow corners (once per corner), the VSC and the safety car
+ * (out, in this lap, green), last lap and the flag. Priorities: 2 =
  * now (damage, crash ahead, box), 1 = soon, 0 = chatter (at least 25 s apart,
  * dropped when stale; see TeamRadio).
  */
@@ -22,6 +24,9 @@ const SLOW_CORNER = 56;
 /** Braking-advice zone around a corner's slowest point (samples before / after). */
 const ZONE_BEFORE = 50;
 const ZONE_AFTER = 30;
+/** Seconds a flag change must hold before the radio call (the VSC often becomes the safety car). */
+const FLAG_WAIT = 1.5;
+const FLAG_LINES = { vsc: 'vsc', 'vsc-ending': 'vsc_ending', sc: 'safety_car', 'sc-in': 'sc_in', green: 'green' } as const;
 
 interface Corner {
   apex: number;
@@ -48,6 +53,10 @@ export class RaceEngineer {
   private adviceAt = -Infinity;
   private time = 0;
   private lineIndex = -1;
+  /** Race control's flag: under the VSC / safety car there is no fight and no lap to push. */
+  private neutral = false;
+  /** Race control's latest flag, called out once it has held for FLAG_WAIT. */
+  private flagCall: { m: Exclude<ControlMessage, 'yellow'>; at: number } | null = null;
   private readonly corners: Corner[];
   /** Corners already given a braking tip (once per corner per race). */
   private readonly advised = new Set<number>();
@@ -90,6 +99,13 @@ export class RaceEngineer {
     }
     if (race.state !== 'racing' || me.finished) return;
 
+    // --- VSC / safety car ---------------------------------------------------------------
+    if (this.flagCall && this.time - this.flagCall.at >= FLAG_WAIT) {
+      this.radio.say(FLAG_LINES[this.flagCall.m], {}, 2);
+      if (this.flagCall.m === 'green') this.neutral = false;
+      this.flagCall = null;
+    }
+
     const standings = race.standings();
     const pos = standings.indexOf(me) + 1;
 
@@ -129,7 +145,7 @@ export class RaceEngineer {
     const ga = ahead ? race.gap(ahead, me) : null;
     this.closeSince.behind = gb !== null && gb < 0.8 ? Math.min(this.closeSince.behind, this.time) : Infinity;
     this.closeSince.ahead = ga !== null && ga < 0.8 ? Math.min(this.closeSince.ahead, this.time) : Infinity;
-    if (this.time - this.closeAt > 150 && this.time - this.racingSince > 30) {
+    if (!this.neutral && this.time - this.closeAt > 150 && this.time - this.racingSince > 30) {
       if (this.time - this.closeSince.behind > 3) {
         this.radio.say('defend', {}, 0);
         this.closeAt = this.time;
@@ -173,13 +189,26 @@ export class RaceEngineer {
       this.lastPit = phase;
     }
 
-    this.brakingAdvice(dt);
+    if (this.neutral) this.zone = null;
+    else this.brakingAdvice(dt);
+  }
+
+  /**
+   * Race control changed the flag (VSC, safety car, green). Local yellows have their own call
+   * (onDamage). Called after a short wait so a VSC that turns into the safety car a moment
+   * later is one call, not two.
+   */
+  onFlag(m: ControlMessage): void {
+    if (m === 'yellow') return;
+    // Back to racing (fights, braking tips) once the green has been called.
+    if (m !== 'green') this.neutral = true;
+    this.flagCall = { m, at: this.time };
   }
 
   /** A car was damaged (impact callback): a crash just ahead of the player is a yellow flag. */
   onDamage(v: Vehicle): void {
     const me = this.me;
-    if (!me || v === this.player || this.race.state !== 'racing' || this.time - this.yellowAt < 30) return;
+    if (!me || v === this.player || this.race.state !== 'racing' || this.neutral || this.time - this.yellowAt < 30) return;
     const other = this.race.racers.find((r) => r.vehicle === v);
     if (!other) return;
     const n = this.track.getCenterline().length;

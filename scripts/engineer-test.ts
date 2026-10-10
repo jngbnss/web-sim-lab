@@ -2,13 +2,17 @@
  * Race engineer check: a headless race where the "player" car is AI-driven,
  * printing what the engineer would say on the team radio and when.
  *
- *   npx tsx scripts/engineer-test.ts [track] [laps] [playerSlot]
+ *   npx tsx scripts/engineer-test.ts [track] [laps] [playerSlot] [--sc]
+ *
+ * --sc: two cars stop on the track 30 s in (until 60 s), so race control calls the
+ * safety car (no safety car vehicle here: it goes in when the leader starts a new lap).
  */
 import type { TeamRadio } from '../src/audio/TeamRadio';
 import { PhysicsWorld } from '../src/physics/PhysicsWorld';
 import { AIDriver } from '../src/race/AIDriver';
 import { applyImpacts } from '../src/race/Impacts';
 import { LapTimer } from '../src/race/LapTimer';
+import { RaceControl } from '../src/race/RaceControl';
 import { RaceEngineer } from '../src/race/RaceEngineer';
 import { RaceManager, type Racer } from '../src/race/RaceManager';
 import { radioText } from '../src/audio/TeamRadio';
@@ -19,7 +23,8 @@ import { racingLineFor } from '../src/world/RacingLineOptimizer';
 import { ProceduralTrack } from '../src/world/Track';
 import { loadLayout } from './tracks-node';
 
-const [trackId = 'monza', lapsArg = '3', slotArg = '9'] = process.argv.slice(2);
+const withSc = process.argv.includes('--sc');
+const [trackId = 'monza', lapsArg = '3', slotArg = '9'] = process.argv.slice(2).filter((a) => a !== '--sc');
 const dt = 1 / 60;
 const physics = await PhysicsWorld.create(dt);
 const track = new ProceduralTrack(physics, loadLayout(trackId), { treesPerKm: 0 });
@@ -49,9 +54,16 @@ const engineer = new RaceEngineer(radio, race, player, track, line, null);
 const lapTimer = new LapTimer(track.getCenterline().length, track.nearestIndex(player.position), 'engineer-test');
 const byCollider = new Map(vehicles.map((v) => [v.physics.collider.handle, v] as [number, Vehicle]));
 const HOLD = { throttle: 0, brake: 1, steer: 0, handbrake: 1 };
+const rc = withSc ? new RaceControl(track) : null;
+if (rc) rc.onMessage = (m) => {
+  said.push(`  t=${t.toFixed(1).padStart(6)}s race control: ${m}`);
+  engineer.onFlag(m);
+};
+const stopped = (slot: number) => withSc && slot >= 18 && t > 30 && t < 60;
+let leaderLap = 0;
 const limit = (track.length * Number(lapsArg)) / 12 + 90;
 while (t < limit && race.state !== 'finished') {
-  for (const r of racers) r.vehicle.fixedUpdate(race.frozen ? HOLD : r.ai!.update(dt, vehicles), dt);
+  racers.forEach((r, slot) => r.vehicle.fixedUpdate(race.frozen || stopped(slot) ? HOLD : r.ai!.update(dt, vehicles), dt));
   physics.step();
   for (const v of vehicles) v.snapshot();
   applyImpacts(physics, byCollider, dt, (v) => engineer.onDamage(v));
@@ -63,6 +75,13 @@ while (t < limit && race.state !== 'finished') {
       race.resync(r);
     }
   race.update(dt);
+  if (rc && !race.frozen) {
+    rc.update(dt, racers, race.time, null, () => false);
+    const lap = Math.floor(race.standings()[0].progress / track.getCenterline().length);
+    if (rc.flag === 'sc-in' && lap > leaderLap) rc.restart();
+    leaderLap = lap;
+    for (const r of racers) r.ai!.rules.noPassing = rc.noOvertaking(r);
+  }
   if (!race.frozen) lapTimer.update(track.nearestIndex(player.position), dt);
   engineer.fixedUpdate(dt, race.frozen ? null : lapTimer.event);
   t += dt;
